@@ -2,55 +2,62 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Duck Knight 3D - THEO EDITION</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>THEO BARBOSA COLEN - DUCK KNIGHT 3D</title>
     <style>
         body, html { 
             margin: 0; padding: 0; overflow: hidden; 
-            background: #050508;
-            font-family: 'Courier New', Courier, monospace;
-            perspective: 1200px;
+            background: #050508; font-family: sans-serif; 
+            perspective: 1200px; touch-action: none;
         }
-
-        #header-name {
-            position: absolute; top: 10px; width: 100%;
-            text-align: center; color: #00ffcc;
-            font-size: 50px; font-weight: bold; letter-spacing: 15px;
-            text-shadow: 0 0 20px #00ffcc; z-index: 10;
+        /* Nome Completo no Topo */
+        #theo-header { 
+            position: absolute; top: 10px; width: 100%; 
+            text-align: center; color: #00ffcc; 
+            font-size: clamp(20px, 5vw, 40px); /* Ajusta o tamanho para celular */
+            font-weight: bold; letter-spacing: 5px; 
+            text-shadow: 0 0 15px #00ffcc; z-index: 10; pointer-events: none; 
+            text-transform: uppercase;
         }
-
-        #ui {
-            position: absolute; top: 80px; left: 20px; z-index: 100;
-            background: rgba(0, 0, 0, 0.85); color: #fff;
-            padding: 15px; border-radius: 5px; border-left: 5px solid #ff0055;
-        }
-
-        .stat { font-size: 18px; margin: 5px 0; }
-        .hp-bar { width: 100px; height: 10px; background: #444; display: inline-block; }
-        .hp-fill { height: 100%; background: #ff0055; transition: width 0.3s; }
+        
+        #ui { position: absolute; top: 70px; left: 10px; z-index: 100; background: rgba(0, 0, 0, 0.7); color: #fff; padding: 10px; border-radius: 5px; font-size: 14px; }
+        .hp-bar { width: 80px; height: 8px; background: #333; display: inline-block; border: 1px solid #fff; }
+        #hp-fill { height: 100%; background: #ff0055; transition: width 0.3s; }
 
         canvas { display: block; transform: rotateX(15deg); }
-        
-        #overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: none;
-            justify-content: center; align-items: center;
-            color: white; font-size: 40px; z-index: 1000; flex-direction: column;
-        }
+
+        /* Controles Mobile */
+        .touch-controls { position: absolute; bottom: 20px; width: 100%; display: flex; justify-content: space-between; padding: 0 20px; box-sizing: border-box; z-index: 1000; }
+        .btn { width: 65px; height: 65px; background: rgba(255, 255, 255, 0.15); border-radius: 50%; display: flex; justify-content: center; align-items: center; color: white; font-weight: bold; user-select: none; -webkit-user-select: none; border: 2px solid rgba(255, 255, 255, 0.3); }
+        .btn:active { background: rgba(0, 255, 204, 0.4); }
+        .d-pad, .actions { display: flex; gap: 10px; }
+
+        #msg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; color: white; font-size: 30px; z-index: 2000; flex-direction: column; }
     </style>
 </head>
 <body>
 
-    <div id="header-name">THEO</div>
+    <div id="theo-header">THEO BARBOSA COLEN</div>
 
     <div id="ui">
-        <div class="stat">VIDA: <div class="hp-bar"><div id="hp-fill" class="hp-fill" style="width: 100%"></div></div></div>
-        <div class="stat">PONTOS: <span id="score">0</span></div>
-        <div style="font-size: 10px; opacity: 0.6; margin-top: 10px;">[M] ATIRAR | [ESPAÇO] PULO DUPLO</div>
+        <div>HP: <div class="hp-bar"><div id="hp-fill" style="width: 100%"></div></div></div>
+        <div>PTS: <span id="score">0</span></div>
     </div>
 
-    <div id="overlay" id="end-screen">
-        <h1 id="end-msg">VITÓRIA!</h1>
-        <button onclick="location.reload()" style="padding: 10px 20px; cursor: pointer;">JOGAR NOVAMENTE</button>
+    <div class="touch-controls">
+        <div class="d-pad">
+            <div class="btn" id="btn-left">←</div>
+            <div class="btn" id="btn-right">→</div>
+        </div>
+        <div class="actions">
+            <div class="btn" id="btn-shoot" style="background: rgba(255,0,85,0.2)">M</div>
+            <div class="btn" id="btn-jump" style="background: rgba(0,255,204,0.2)">UP</div>
+        </div>
+    </div>
+
+    <div id="msg">
+        <h1 id="status-text">VITÓRIA!</h1>
+        <button onclick="location.reload()" style="padding: 15px; background: #00ffcc; border: none; font-weight: bold; cursor: pointer;">RECOMEÇAR</button>
     </div>
 
     <canvas id="game"></canvas>
@@ -58,229 +65,153 @@
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
 
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-window.onresize = resize;
-resize();
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.onresize = resize; resize();
 
-// CONFIGURAÇÕES
 const WORLD = { w: 6000, h: 2000 };
-const GRAVITY = 0.5;
+const GRAVITY = 0.55;
 const FRICTION = 0.82;
-
+let gameActive = true;
 const keys = {};
-window.onkeydown = (e) => {
-    keys[e.code] = true;
-    if(e.code === 'KeyM') player.shoot();
-};
+
+// Touch Events
+function setupTouch(id, keyCode) {
+    const btn = document.getElementById(id);
+    btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyCode] = true; if(keyCode === 'KeyM') player.shoot(); });
+    btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyCode] = false; });
+}
+setupTouch('btn-left', 'ArrowLeft');
+setupTouch('btn-right', 'ArrowRight');
+setupTouch('btn-jump', 'Space');
+setupTouch('btn-shoot', 'KeyM');
+
+// Keyboard Events
+window.onkeydown = (e) => { keys[e.code] = true; if(e.code === 'KeyM' && gameActive) player.shoot(); };
 window.onkeyup = (e) => keys[e.code] = false;
 
-// --- CLASSE PROJÉTIL (TIROS) ---
 class Bullet {
     constructor(x, y, dir, owner) {
-        this.x = x; this.y = y;
-        this.vx = dir * 15;
-        this.owner = owner; // 'player' ou 'bot'
-        this.active = true;
+        this.x = x; this.y = y; this.vx = dir * 17;
+        this.owner = owner; this.active = true;
     }
-    update() {
-        this.x += this.vx;
-        if(this.x < 0 || this.x > WORLD.w) this.active = false;
-    }
+    update() { this.x += this.vx; if(this.x < 0 || this.x > WORLD.w) this.active = false; }
     draw(ox, oy) {
         ctx.fillStyle = this.owner === 'player' ? "#00ffcc" : "#ff0055";
-        ctx.shadowBlur = 10; ctx.shadowColor = ctx.fillStyle;
         ctx.fillRect(this.x - ox, this.y - oy, 15, 4);
-        ctx.shadowBlur = 0;
     }
 }
 
-// --- CLASSE PLAYER ---
-class Duck {
+class Player {
     constructor() {
-        this.x = 200; this.y = 1700;
-        this.w = 40; this.h = 40;
-        this.vx = 0; this.vy = 0;
-        this.hp = 3;
-        this.jumps = 0;
-        this.grounded = false;
-        this.facing = 1;
-        this.bullets = [];
+        this.x = 200; this.y = 1700; this.w = 40; this.h = 40;
+        this.vx = 0; this.vy = 0; this.hp = 3; this.jumps = 0;
+        this.grounded = false; this.facing = 1; this.bullets = [];
     }
-
-    shoot() {
-        this.bullets.push(new Bullet(this.x + 20, this.y + 20, this.facing, 'player'));
-    }
-
+    shoot() { this.bullets.push(new Bullet(this.x + 20, this.y + 20, this.facing, 'player')); }
     update() {
-        if (keys['KeyA'] || keys['ArrowLeft']) { this.vx -= 1.1; this.facing = -1; }
-        if (keys['KeyD'] || keys['ArrowRight']) { this.vx += 1.1; this.facing = 1; }
-        
+        if (keys['ArrowLeft'] || keys['KeyA']) { this.vx -= 1.2; this.facing = -1; }
+        if (keys['ArrowRight'] || keys['KeyD']) { this.vx += 1.2; this.facing = 1; }
         if (keys['Space']) {
-            if (this.grounded) { this.vy = -13; this.jumps = 1; this.grounded = false; }
-            else if (this.jumps === 1) { this.vy = -10; this.jumps = 2; }
+            if (this.grounded) { this.vy = -14; this.jumps = 1; this.grounded = false; }
+            else if (this.jumps === 1) { this.vy = -11; this.jumps = 2; }
             keys['Space'] = false;
         }
-
-        this.vx *= FRICTION;
-        this.vy += GRAVITY;
-        this.x += this.vx;
-        this.y += this.vy;
-
+        this.vx *= FRICTION; this.vy += GRAVITY;
+        this.x += this.vx; this.y += this.vy;
         this.bullets.forEach(b => b.update());
         this.bullets = this.bullets.filter(b => b.active);
     }
-
     draw(ox, oy) {
-        const px = this.x - ox;
-        const py = this.y - oy;
-        ctx.fillStyle = "yellow";
-        ctx.beginPath();
-        ctx.arc(px+20, py+20, 20, 0, Math.PI*2);
-        ctx.fill();
-        ctx.fillStyle = "orange";
-        ctx.fillRect(px + (this.facing === 1 ? 30 : -10), py + 15, 20, 8);
+        const px = this.x - ox; const py = this.y - oy;
+        ctx.fillStyle = "#FFD600"; ctx.beginPath(); ctx.arc(px+20, py+20, 20, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "orange"; ctx.fillRect(px + (this.facing === 1 ? 30 : -10), py + 15, 15, 8);
         this.bullets.forEach(b => b.draw(ox, oy));
     }
 }
 
-// --- CLASSE BOT (INIMIGO) ---
 class Bot {
-    constructor(x, y) {
-        this.x = x; this.y = y;
-        this.w = 40; this.h = 50;
-        this.hp = 5;
-        this.bullets = [];
-        this.shootTimer = 0;
-    }
-    update(playerX) {
-        this.shootTimer++;
-        if(this.shootTimer > 80) { // Atira a cada 80 frames
-            let dir = playerX < this.x ? -1 : 1;
-            this.bullets.push(new Bullet(this.x, this.y + 20, dir, 'bot'));
-            this.shootTimer = 0;
+    constructor(x, y) { this.x = x; this.y = y; this.w = 40; this.h = 50; this.hp = 5; this.bullets = []; this.timer = 0; }
+    update(px) {
+        this.timer++;
+        if(this.timer > 100) {
+            let d = px < this.x ? -1 : 1;
+            this.bullets.push(new Bullet(this.x, this.y + 20, d, 'bot'));
+            this.timer = 0;
         }
         this.bullets.forEach(b => b.update());
-        this.bullets = this.bullets.filter(b => b.active);
     }
     draw(ox, oy) {
-        const rx = this.x - ox;
-        const ry = this.y - oy;
-        ctx.fillStyle = "#444";
-        ctx.fillRect(rx, ry, 40, 50);
-        ctx.fillStyle = "red";
-        ctx.fillRect(rx + 5, ry + 10, 30, 10); // Visor
+        ctx.fillStyle = "#333"; ctx.fillRect(this.x - ox, this.y - oy, 40, 50);
+        ctx.fillStyle = "red"; ctx.fillRect(this.x - ox + 5, this.y - oy + 5, 30, 8);
         this.bullets.forEach(b => b.draw(ox, oy));
     }
 }
 
 const platforms = [
     {x: 0, y: 1850, w: 6000, h: 100},
-    {x: 600, y: 1700, w: 300, h: 30},
-    {x: 1100, y: 1550, w: 300, h: 30},
-    {x: 1600, y: 1400, w: 400, h: 30},
-    {x: 2200, y: 1550, w: 300, h: 30},
-    {x: 2800, y: 1400, w: 500, h: 30},
-    {x: 3500, y: 1250, w: 300, h: 30},
-    {x: 4000, y: 1100, w: 600, h: 30},
-    {x: 4800, y: 1250, w: 400, h: 30},
-    {x: 5500, y: 1100, w: 400, h: 30}, // Plataforma Final
+    {x: 800, y: 1700, w: 300, h: 30},
+    {x: 1600, y: 1550, w: 400, h: 30},
+    {x: 2500, y: 1400, w: 400, h: 30},
+    {x: 3500, y: 1500, w: 600, h: 30},
+    {x: 5000, y: 1300, w: 800, h: 30}
 ];
 
-const bots = [new Bot(1200, 1500), new Bot(2500, 1500), new Bot(4200, 1050)];
-const exitDoor = { x: 5750, y: 1000, w: 60, h: 100 };
-const player = new Duck();
+const bots = [new Bot(1600, 1500), new Bot(3600, 1450), new Bot(5200, 1250)];
+const exitDoor = { x: 5850, y: 1100, w: 100, h: 200 };
+const player = new Player();
 let camX = 0, camY = 1500;
-let score = 0;
-let gameActive = true;
 
-function checkCollisions() {
-    // Player vs Plataformas
+function check() {
     player.grounded = false;
     platforms.forEach(p => {
-        if (player.x + player.w > p.x && player.x < p.x + p.w &&
-            player.y + player.h > p.y && player.y + player.h < p.y + p.h + 20 && player.vy >= 0) {
-            player.y = p.y - player.h;
-            player.vy = 0; player.grounded = true; player.jumps = 0;
+        if (player.x + player.w > p.x && player.x < p.x + p.w && player.y + player.h > p.y && player.y + player.h < p.y + p.h + 20 && player.vy >= 0) {
+            player.y = p.y - player.h; player.vy = 0; player.grounded = true; player.jumps = 0;
         }
     });
-
-    // Tiros do Player vs Bots
     player.bullets.forEach(b => {
-        bots.forEach((bot, bi) => {
+        bots.forEach((bot, i) => {
             if(b.x > bot.x && b.x < bot.x + bot.w && b.y > bot.y && b.y < bot.y + bot.h) {
-                bot.hp--;
-                b.active = false;
-                if(bot.hp <= 0) {
-                    bots.splice(bi, 1);
-                    score += 100;
-                    document.getElementById('score').innerText = score;
-                }
+                bot.hp--; b.active = false;
+                if(bot.hp <= 0) { bots.splice(i, 1); scoreEl.innerText = parseInt(scoreEl.innerText)+100; }
             }
         });
     });
-
-    // Tiros dos Bots vs Player
     bots.forEach(bot => {
         bot.bullets.forEach(b => {
             if(b.x > player.x && b.x < player.x + player.w && b.y > player.y && b.y < player.y + player.h) {
-                player.hp--;
-                b.active = false;
-                document.getElementById('hp-fill').style.width = (player.hp/3 * 100) + "%";
-                if(player.hp <= 0) endGame(false);
+                player.hp--; b.active = false;
+                document.getElementById('hp-fill').style.width = (player.hp/3*100) + "%";
+                if(player.hp <= 0) finish(false);
             }
         });
     });
-
-    // Vitória (Porta)
-    if(player.x + player.w > exitDoor.x && player.x < exitDoor.x + exitDoor.w &&
-       player.y + player.h > exitDoor.y) {
-       endGame(true);
-    }
+    if(player.x > exitDoor.x) finish(true);
 }
 
-function endGame(win) {
+function finish(v) {
     gameActive = false;
-    document.getElementById('overlay').style.display = 'flex';
-    document.getElementById('end-msg').innerText = win ? "VITÓRIA!" : "VOCÊ MORREU!";
+    document.getElementById('msg').style.display = 'flex';
+    document.getElementById('status-text').innerText = v ? "VITÓRIA!" : "DERROTA!";
 }
 
 function loop() {
     if(!gameActive) return;
-
-    ctx.fillStyle = "#0a0a12";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    player.update();
-    bots.forEach(bot => bot.update(player.x));
-    checkCollisions();
-
-    camX += (player.x - canvas.width/2 - camX) * 0.08;
-    camY += (player.y - canvas.height/1.5 - camY) * 0.08;
-
-    // Desenhar Mundo
+    ctx.fillStyle = "#050508"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    player.update(); bots.forEach(b => b.update(player.x));
+    check();
+    camX += (player.x - canvas.width/2 - camX) * 0.1;
+    camY += (player.y - canvas.height/1.5 - camY) * 0.1;
     platforms.forEach(p => {
-        ctx.fillStyle = "#1e272e";
-        ctx.fillRect(p.x - camX, p.y - camY, p.w, p.h);
-        ctx.fillStyle = "#00ffcc";
-        ctx.fillRect(p.x - camX, p.y - camY, p.w, 4);
+        ctx.fillStyle = "#1e272e"; ctx.fillRect(p.x - camX, p.y - camY, p.w, p.h);
+        ctx.fillStyle = "#00ffcc"; ctx.fillRect(p.x - camX, p.y - camY, p.w, 4);
     });
-
-    // Porta de Saída (3D)
-    ctx.fillStyle = "#ffcc00";
-    ctx.shadowBlur = 20; ctx.shadowColor = "gold";
-    ctx.fillRect(exitDoor.x - camX, exitDoor.y - camY, exitDoor.w, exitDoor.h);
-    ctx.shadowBlur = 0;
-
-    bots.forEach(bot => bot.draw(camX, camY));
+    ctx.fillStyle = "gold"; ctx.fillRect(exitDoor.x - camX, exitDoor.y - camY, exitDoor.w, exitDoor.h);
+    bots.forEach(b => b.draw(camX, camY));
     player.draw(camX, camY);
-
     requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 </body>
